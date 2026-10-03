@@ -2,7 +2,7 @@ search: {lat: 39.739154, lon: -104.984703, miles: 100}
 model: {name: ViT-B-16-SigLIP, pretrained: webli, batch_size: 32}
 template: "a photo of {}"
 # per-category score = sum of softmax probs over that category's positive prompts
-thresholds: {mirror: 0.70, cabinet: 0.75, buddhist: 0.60}
+thresholds: {mirror: 0.80, cabinet: 0.85, buddhist: 0.85}
 caption_boost: 0.40      # added to score when the photo caption has a keyword
 description_boost: 0.10  # added when only the sale description has one
 max_images_per_run: 3000 # CI time guard; the rest is picked up next run
@@ -30,7 +30,6 @@ prompts:
     - an antique carved cabinet
     - a card catalog cabinet
     - a mid-century modern credenza
-    - a vintage curio cabinet
     - a painted folk-art cabinet
     - an industrial metal flat file cabinet
   buddhist:
@@ -88,3 +87,25 @@ negatives:
   - a collection of knick knacks
   - an empty room
   - a person
+  - a steamer trunk
+  - a cedar hope chest
+  - an Asian folding screen
+  - a carved wood wall panel
+  - a glass display case
+  - a glass curio cabinet with figurines
+  - a CD and record storage box
+  - a beaded necklace
+  - a rosary
+  - a pre-Columbian stone artifact
+  - a primitive stone mask
+  - a Madonna and child sculpture
+  - a sun face wall plaque
+  - an Inuit soapstone carving
+  - copper mixing bowls
+  - a garden bell
+  - a mirrored vanity tray
+  - a small hand mirror
+  - a metal garage storage cabinet
+  - a mechanic's rolling tool chest
+  - a modern particleboard TV stand
+  - a plastic parts organizer
