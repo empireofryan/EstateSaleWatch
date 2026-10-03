@@ -19,12 +19,17 @@ Python 3.12, requests, open_clip (SigLIP ViT-B-16 webli, torch CPU), PyYAML, Pil
 See README. venv at `.venv/`, all caches under `.cache/` (both gitignored).
 
 ## Status
-Local end-to-end verified (scan 3 sales, digest). Not yet pushed; no GitHub repo created. Workflow untested on Actions.
+LIVE (2026-10-03). Repo: github.com/empireofryan/EstateSaleWatch (private). Daily scan 12:00 UTC; digest issue Wed+Fri (emails via @mention).
+First digest issue #1 sent 2026-10-03 (54 hits). Backlog (15k photos) was scored locally on the Mac (21 img/s); Actions runner does only ~2.4 img/s, so a full rescore must be done locally.
+Next ideas: thumbs-up/down feedback to tune thresholds; cabinet category is broad ("unique" is subjective).
 
 ## Decisions
 - NO LLM APIs or SDKs, ever. Classifier is local open-source CLIP-family only.
 - Scheduled work runs on GitHub Actions cron, never the laptop.
 - SigLIP beat laion2b ViT-B-32 on the mirror calibration set (recall 7/7 vs 4/7) but is ~4x slower; max_images_per_run caps CI time.
+- Thresholds after QA 2026-10-03: mirror 0.80, cabinet 0.85, buddhist 0.85 + extra distractor negatives (trunks, screens, necklaces, rosaries, tool chests).
+- To rescore everything after a config change: reset state/seen.json + hits.json, run `.venv/bin/python watch.py --max-images 30000` locally, commit state.
+- CI installs torch+torchvision from the CPU index together (mismatch broke the first run).
 - Keep test downloads tiny (thumbnails); disk was once 100% full.
 - Mirror/cabinet/buddhist thresholds chosen on small sets; Buddhist verified on real thangka/Buddha/Guanyin captions (score >0.99).
 - Sale detail: type 64 = online auction (tagged in digest); sales with no pictures are skipped.
