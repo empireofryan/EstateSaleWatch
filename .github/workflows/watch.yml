@@ -36,7 +36,9 @@ jobs:
         with:
           path: .cache/hf
           key: model-ViT-B-16-SigLIP-webli   # bump if config.yaml model changes
-      - run: pip install -r requirements.txt
+      - run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
       - name: Decide what to run
         id: plan
         run: |
