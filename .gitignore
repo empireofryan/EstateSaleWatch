@@ -1,0 +1,7 @@
+.venv/
+.cache/
+__pycache__/
+*.pyc
+digest.md
+tests/_work/
+digest_count.txt
