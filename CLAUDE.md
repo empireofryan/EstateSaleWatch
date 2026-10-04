@@ -23,6 +23,7 @@ See README. venv at `.venv/`, all caches under `.cache/` (both gitignored).
 ## Status
 LIVE (2026-10-03). Repo: github.com/empireofryan/EstateSaleWatch (private). Daily scan 12:00 UTC; digest issue Wed+Fri (emails via @mention).
 First digest issue #1 sent 2026-10-03 (54 hits). Backlog (15k photos) was scored locally on the Mac (21 img/s); Actions runner does only ~2.4 img/s, so a full rescore must be done locally.
+Sale "standout" threshold 0.92 (2026-10-03: 14 of 93 sales). art_deco 0.92. Jewelry/coins/memorabilia are luxe "ordinary" counterweights.
 Next ideas: thumbs-up/down feedback to tune thresholds; cabinet category is broad ("unique" is subjective).
 
 ## Decisions

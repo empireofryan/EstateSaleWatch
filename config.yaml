@@ -2,7 +2,7 @@ search: {lat: 39.739154, lon: -104.984703, miles: 100}
 model: {name: ViT-B-16-SigLIP, pretrained: webli, batch_size: 32}
 template: "a photo of {}"
 # per-category score = sum of softmax probs over that category's positive prompts
-thresholds: {mirror: 0.80, cabinet: 0.85, buddhist: 0.85, art_deco: 0.85}
+thresholds: {mirror: 0.80, cabinet: 0.85, buddhist: 0.85, art_deco: 0.92}
 caption_boost: 0.40      # added to score when the photo caption has a keyword
 description_boost: 0.10  # added when only the sale description has one
 max_images_per_run: 3000 # CI time guard; the rest is picked up next run
@@ -38,6 +38,11 @@ luxe:
     - a leather sofa and coffee table
     - mass-market home decor
     - a movie star poster print
+    - rings and necklaces laid out for sale
+    - a tray of costume jewelry
+    - coins and paper currency
+    - sports memorabilia and trading cards
+    - a used car
 sale:
   top_k: 15
   min_photos: 5
@@ -47,7 +52,7 @@ sale:
   kw_each: 0.04       # per distinct text keyword (title/description/captions)
   kw_cap: 0.20
   featured_bonus: 0.05  # API isLocally/Regionally/NationallyFeatured
-  threshold: 0.70
+  threshold: 0.92
   strip: 5            # thumbnails per standout in the digest
   keywords: [designer, fine art, signed, original art, collector, gallery, antique, sterling, baccarat, lalique, waterford, herman miller, knoll, eames, baker, henredon, stickley, rolex, persian rug, oriental rug, bronze, provenance, museum, luxury, high end, high-end, fine furniture]
 prune_days: 14
@@ -95,6 +100,13 @@ prompts:
     - Art Deco jewelry
     - a streamline moderne radio or clock
 negatives:
+  - modern bar stools
+  - an Art Nouveau poster
+  - a vintage show or concert poster
+  - a mid-century modern lounge chair
+  - glass salt and pepper shakers
+  - a modern glass coffee table
+  - a roll-top desk
   - a calendar or book cover
   - a pencil sketch or watercolor illustration
   - a set of silverware flatware
