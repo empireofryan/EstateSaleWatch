@@ -39,3 +39,9 @@ Next ideas: thumbs-up/down feedback to tune thresholds; cabinet category is broa
 - art_deco threshold 0.85 (caption keyword adds 0.4). Many modern/postmodern glass+chrome distractor negatives; keyword "=deco" means whole word (so "decor" does not match).
 - A fresh/reset run populates sales.json; sales scored before this feature have no stats and never flag until rescored.
 - Sale detail: type 64 = online auction (tagged in digest); sales with no pictures are skipped.
+
+## Web app (2026-10-03)
+- https://estatesalewatch.vercel.app : Vite+React SPA + Vercel functions in `web/` (project root dir = `web`, set via API). Git-connected; `ignoreCommand` skips builds when web/ unchanged (daily state commits).
+- DB: Turso `estatesalewatch` on Ryan's paid Developer plan ($4.99/mo flat). Schema `db/schema.sql`. Creds in `.env.local` + GH secrets + Vercel env.
+- Email: Resend (haultax.com account, from alerts@haultax.com) daily after scan; one-tap signed vote links; magic login link (no password). First send 2026-10-04 03:49Z, 66 items, landed in Inbox.
+- Design: lapis #0F3A45 + gilt #D6A53A Deco, Limelight + Josefin Sans, gilt-framed photo plates, dharma-wheel taste meters.
