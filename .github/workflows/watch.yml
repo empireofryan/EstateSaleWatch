@@ -73,7 +73,7 @@ jobs:
           if [ -f digest.md ]; then
             N=$(cat digest_count.txt)
             gh label create digest --color 0E8A16 --force
-            gh issue create --title "Estate sale finds – $(date -u +%F) ($N hits)" \
+            gh issue create --title "Estate sale finds – $(date -u +%F) ($N)" \
               --label digest --body-file digest.md
             git config user.name "estate-watch[bot]"
             git config user.email "actions@users.noreply.github.com"

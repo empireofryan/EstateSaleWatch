@@ -43,30 +43,51 @@ class Classifier:
         self.bias = getattr(self.model, "logit_bias", None)
         self.bs = m.get("batch_size", 64)
         self.cat_idx = {c: [i for i, o in enumerate(self.owner) if o == c] for c in self.cats}
+        # separate "luxe" prompt set (sale-level high-end signal), softmax over luxe+ordinary only
+        lx = cfg.get("luxe") or {}
+        self.luxe_phr = list(lx.get("positive", [])) + list(lx.get("ordinary", []))
+        self.n_luxe = len(lx.get("positive", []))
+        if self.luxe_phr:
+            with torch.no_grad():
+                tf = self.model.encode_text(tok([cfg["template"].format(p) for p in self.luxe_phr]))
+                self.ltext = tf / tf.norm(dim=-1, keepdim=True)
+
+    def _logits(self, f, text):
+        logits = self.scale * f @ text.T
+        if self.bias is not None:
+            logits = logits + self.bias
+        return logits
 
     @torch.no_grad()
-    def probs(self, images):
-        """images: list of PIL -> tensor [N, n_prompts] softmax probs."""
-        out = []
+    def probs(self, images, with_luxe=False):
+        """images: list of PIL -> tensor [N, n_prompts] softmax probs (plus luxe probs if asked).
+        Image embeddings are computed once and shared by both prompt sets."""
+        out, lout = [], []
         for i in range(0, len(images), self.bs):
             x = torch.stack([self.preprocess(im) for im in images[i:i + self.bs]])
             f = self.model.encode_image(x)
             f = f / f.norm(dim=-1, keepdim=True)
-            logits = self.scale * f @ self.text.T
-            if self.bias is not None:
-                logits = logits + self.bias
-            out.append(logits.softmax(-1))
+            out.append(self._logits(f, self.text).softmax(-1))
+            if with_luxe and self.luxe_phr:
+                lout.append(self._logits(f, self.ltext).softmax(-1))
+        if with_luxe:
+            return torch.cat(out), (torch.cat(lout) if lout else None)
         return torch.cat(out)
 
     def score(self, images):
-        """-> list of {category: score} plus top phrase per category."""
-        p = self.probs(images)
+        """-> list of {category: (score, top phrase)}; with the luxe set configured each dict also has
+        key "_luxe": (P(luxe prompts), top luxe phrase)."""
+        p, lp = self.probs(images, with_luxe=True)
         res = []
-        for row in p:
+        for n, row in enumerate(p):
             d = {}
             for c, idx in self.cat_idx.items():
                 best = max(idx, key=lambda i: row[i].item())
                 d[c] = (float(row[idx].sum()), self.phrases[best])
+            if lp is not None:
+                lr = lp[n]
+                best = int(lr[:self.n_luxe].argmax())
+                d["_luxe"] = (float(lr[:self.n_luxe].sum()), self.luxe_phr[best])
             res.append(d)
         return res
 
@@ -78,5 +99,16 @@ def load_image(path):
 def keyword_hits(text, cfg):
     """-> set of categories whose keywords appear in text."""
     t = (text or "").lower()
-    return {c for c, kws in cfg["keywords"].items()
-            if any(re.search(r"\b" + re.escape(k), t) for k in kws)}
+    return {c for c, kws in cfg["keywords"].items() if match_keywords(t, kws)}
+
+
+def match_keywords(text, kws):
+    """-> list of matched keywords. Prefix match on word start; a leading "=" means whole word only."""
+    t = (text or "").lower()
+    out = []
+    for k in kws:
+        whole = k.startswith("=")
+        k = k.lstrip("=")
+        if re.search(r"\b" + re.escape(k) + (r"\b" if whole else ""), t):
+            out.append(k)
+    return out

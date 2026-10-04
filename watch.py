@@ -9,10 +9,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 STATE = ROOT / "state"
+OUT = ROOT  # digest.md / digest_count.txt go here (the state dir when --state-dir is used)
 sys.path.insert(0, str(ROOT))
-from estate import api  # noqa: E402
+from estate import api, sales as salemod  # noqa: E402
 
-CATS = {"mirror": "Large mirrors", "cabinet": "Interesting cabinets", "buddhist": "Buddhist pieces"}
+CATS = {"mirror": "Large mirrors", "cabinet": "Interesting cabinets", "buddhist": "Buddhist pieces",
+        "art_deco": "Art Deco"}
 
 
 def load(name, default):
@@ -40,6 +42,7 @@ def scan(args):
     seen.setdefault("pics", {}); seen.setdefault("sales", {})
     hits = load("hits.json", {})
     hits.setdefault("sales", {}); hits.setdefault("hits", {})
+    sstats = load("sales.json", {})  # per-sale luxe stats, accumulated across runs
     se = cfg["search"]
     rows = api.fetch_list(se["lat"], se["lon"], se["miles"])
     t0 = today()
@@ -64,6 +67,10 @@ def scan(args):
         if not pics:
             print(f"  sale {r['id']} ({r.get('typeName')}): no pictures, skipped"); continue
         meta = api.normalize(d, r)
+        feat = any(d.get(k) for k in ("isLocallyFeatured", "isRegionallyFeatured", "isNationallyFeatured"))
+        meta["featured"] = bool(feat)
+        st = sstats.setdefault(str(meta["id"]), salemod.new_stats())
+        salemod.add_text(st, meta["name"] + " " + meta["text"], [], cfg, feat)
         hits["sales"][str(meta["id"])] = {k: v for k, v in meta.items() if k != "text"}
         seen["sales"][str(meta["id"])] = meta["end"]
         for p in pics:
@@ -93,10 +100,16 @@ def scan(args):
             ok = [(it, im) for it, im in zip(chunk, imgs) if im is not None]
             scores = clf.score([im for _, im in ok]) if ok else []
             for (meta, p), sc in zip((it for it, _ in ok), scores):
+                st = sstats.setdefault(str(meta["id"]), salemod.new_stats())
+                if "_luxe" in sc:
+                    salemod.add_photo(st, sc["_luxe"][0], p["id"], p, cfg["sale"]["top_k"], cfg["sale"]["frac_cut"])
+                    salemod.add_text(st, "", [p["caption"]], cfg)
                 kw_cap = classify.keyword_hits(p["caption"], cfg)
                 kw_desc = classify.keyword_hits(meta["text"] + " " + meta["name"], cfg)
                 cats = {}
                 for c, (s, phrase) in sc.items():
+                    if c.startswith("_"):
+                        continue
                     boost = cfg["caption_boost"] if c in kw_cap else (cfg["description_boost"] if c in kw_desc else 0)
                     final = min(1.0, s + boost)
                     if final >= cfg["thresholds"][c]:
@@ -112,7 +125,7 @@ def scan(args):
                     seen["pics"][str(p["id"])] = meta["id"]
             done += len(ok)
             print(f"  scored {done}/{len(todo)} ({done / (time.time() - t0s):.1f} img/s), hits so far {new_hits}", flush=True)
-            save("seen.json", seen); save("hits.json", hits)  # checkpoint
+            save("seen.json", seen); save("hits.json", hits); save("sales.json", sstats)  # checkpoint
         print(f"{new_hits} new hits")
     # prune sales that ended > prune_days ago
     cutoff = (date.today() - timedelta(days=cfg["prune_days"])).isoformat()
@@ -121,9 +134,9 @@ def scan(args):
         seen["pics"] = {p: s for p, s in seen["pics"].items() if str(s) not in old}
         hits["hits"] = {p: h for p, h in hits["hits"].items() if str(h["sale"]) not in old}
         for s in old:
-            seen["sales"].pop(s, None); hits["sales"].pop(s, None)
+            seen["sales"].pop(s, None); hits["sales"].pop(s, None); sstats.pop(s, None)
         print(f"pruned {len(old)} ended sales")
-    save("seen.json", seen); save("hits.json", hits)
+    save("seen.json", seen); save("hits.json", hits); save("sales.json", sstats)
 
 
 def digest(args):
@@ -142,6 +155,33 @@ def digest(args):
     cap = cfg["digest_cap_per_category"]
     out, used = [], set()
     total = 0
+    # Standout (high-end) sales first; each is announced once (tracked in standouts.json)
+    sstats = load("sales.json", {})
+    announced = set(load("standouts.json", []))
+    sc = cfg["sale"]
+    stand = []
+    for sid, st in sstats.items():
+        m = hits["sales"].get(sid)
+        if not m or m["end"] < t0 or sid in announced:
+            continue
+        sco, parts = salemod.score(st, cfg)
+        if sco >= sc["threshold"]:
+            stand.append((sco, sid, m, st, parts))
+    stand.sort(key=lambda x: -x[0])
+    if stand:
+        out.append("## Standout sales\n\nSales whose photos and text look high end (fine art, designer or antique furniture, collector pieces).\n")
+        for sco, sid, m, st, parts in stand:
+            tag = " `online auction`" if m.get("online") else ""
+            where = ", ".join(x for x in [m.get("city")] if x)
+            when = f"ends {m['end']}" if m.get("online") else f"{m['start']} to {m['end']}"
+            kws = ", ".join(st["kw"]) or "none"
+            out.append(f"### [{m['name'].strip() or 'Sale ' + str(sid)}]({m['page']}){tag}")
+            out.append(f"{where or 'Colorado'}, {when}  \n"
+                       f"Why: score **{min(sco, 1.0):.2f}** ({parts['frac']:.0%} of {st['n']} photos look high end"
+                       f"{', API featured' if st['feat'] else ''}); keywords: {kws}\n")
+            strip = " ".join(f"[![luxe {r[0]:.2f}]({r[2]})]({r[3]})" for r in st["top"][:sc["strip"]])
+            out.append(strip + "\n")
+    nstand = len(stand)
     for c, title in CATS.items():
         flat = sorted(((s, pid, h) for L in by_cat[c].values() for s, pid, h in L), key=lambda x: -x[0])[:cap]
         if not flat:
@@ -164,17 +204,19 @@ def digest(args):
                 out.append(f"[![{c} {s:.2f}]({h['thumb']})]({h['url']})  \n"
                            f"score **{s:.2f}**{cap_txt}\n")
                 used.add(pid); total += 1
-    dflag = ROOT / "digest.md"
+    dflag = OUT / "digest.md"
     if not out:
         dflag.unlink(missing_ok=True)
-        (ROOT / "digest_count.txt").unlink(missing_ok=True)
+        (OUT / "digest_count.txt").unlink(missing_ok=True)
         print("no new hits; no digest written")
         return
-    head = f"# Estate sale finds, {t0} ({total} hits)\n\nFront Range CO, photos flagged by a local CLIP model. @empireofryan\n\n"
+    head = (f"# Estate sale finds, {t0} ({total} hits, {nstand} standout sales)\n\n"
+            "Front Range CO, photos flagged by a local CLIP model. @empireofryan\n\n")
     dflag.write_text(head + "\n".join(out))
-    (ROOT / "digest_count.txt").write_text(str(total))
+    (OUT / "digest_count.txt").write_text(f"{total} hits, {nstand} standout" if nstand else f"{total} hits")
     save("digested.json", sorted(digested | used))
-    print(f"digest.md written ({total} hits)")
+    save("standouts.json", sorted(announced | {x[1] for x in stand}))
+    print(f"digest.md written ({total} hits, {nstand} standout sales)")
 
 
 def main():
@@ -182,7 +224,11 @@ def main():
     ap.add_argument("--digest", action="store_true")
     ap.add_argument("--max-sales", type=int)
     ap.add_argument("--max-images", type=int)
+    ap.add_argument("--state-dir", help="use this dir for state/*.json and digest output (testing)")
     a = ap.parse_args()
+    if a.state_dir:
+        global STATE, OUT
+        STATE = OUT = Path(a.state_dir).resolve()
     (digest if a.digest else scan)(a)
 
 

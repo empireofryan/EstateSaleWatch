@@ -2,15 +2,54 @@ search: {lat: 39.739154, lon: -104.984703, miles: 100}
 model: {name: ViT-B-16-SigLIP, pretrained: webli, batch_size: 32}
 template: "a photo of {}"
 # per-category score = sum of softmax probs over that category's positive prompts
-thresholds: {mirror: 0.80, cabinet: 0.85, buddhist: 0.85}
+thresholds: {mirror: 0.80, cabinet: 0.85, buddhist: 0.85, art_deco: 0.85}
 caption_boost: 0.40      # added to score when the photo caption has a keyword
 description_boost: 0.10  # added when only the sale description has one
 max_images_per_run: 3000 # CI time guard; the rest is picked up next run
 keywords:
   mirror: [mirror, cheval, trumeau]
   cabinet: [tansu, apothecary, card catalog, curio]
+  art_deco: [art deco, =deco, waterfall, streamline, machine age, erte, "erté", lalique, chase chrome, bakelite, frankart, nouveau-deco]
   buddhist: [buddha, buddhist, thangka, tibetan, guanyin, kwan yin, singing bowl, butsudan, mala]
 digest_cap_per_category: 20
+# sale-level "high-end" flag: luxe prob per photo = softmax over these two lists only
+luxe:
+  positive:
+    - fine antique furniture
+    - museum-quality artwork
+    - high-end designer furniture
+    - sterling silver
+    - fine crystal and porcelain
+    - an elegant curated living room
+    - a bronze sculpture
+    - a hand-knotted oriental rug
+    - a signed original painting
+  ordinary:
+    - a garage full of tools
+    - a cluttered basement
+    - cheap particleboard furniture
+    - plastic storage bins
+    - kitchen utensils on a table
+    - piles of clothing
+    - holiday decorations
+    - yard equipment
+    - auto parts
+    - ordinary household clutter
+    - a leather sofa and coffee table
+    - mass-market home decor
+    - a movie star poster print
+sale:
+  top_k: 15
+  min_photos: 5
+  frac_cut: 0.8       # a photo counts as 'luxe' at prob >= this (0.5 separated worse on calibration)
+  w_top: 0.2          # weight of mean luxe prob over the top-K photos (saturates at 1.0 for big sales)
+  w_frac: 0.8         # weight of fraction of photos at/above frac_cut
+  kw_each: 0.04       # per distinct text keyword (title/description/captions)
+  kw_cap: 0.20
+  featured_bonus: 0.05  # API isLocally/Regionally/NationallyFeatured
+  threshold: 0.70
+  strip: 5            # thumbnails per standout in the digest
+  keywords: [designer, fine art, signed, original art, collector, gallery, antique, sterling, baccarat, lalique, waterford, herman miller, knoll, eames, baker, henredon, stickley, rolex, persian rug, oriental rug, bronze, provenance, museum, luxury, high end, high-end, fine furniture]
 prune_days: 14
 prompts:
   mirror:
@@ -43,7 +82,35 @@ prompts:
     - Tibetan prayer flags
     - a bodhisattva statue
     - a Japanese temple bell
+  art_deco:
+    - Art Deco furniture
+    - an Art Deco waterfall dresser or vanity
+    - an Art Deco geometric lamp
+    - Art Deco chrome and glass
+    - an Art Deco bronze figurine, Erte-style sculpture
+    - an Art Deco sunburst mirror
+    - an Art Deco vase, Lalique-style glass
+    - an Art Deco poster
+    - an Art Deco cocktail shaker and barware
+    - Art Deco jewelry
+    - a streamline moderne radio or clock
 negatives:
+  - a calendar or book cover
+  - a pencil sketch or watercolor illustration
+  - a set of silverware flatware
+  - decorative bookends
+  - an abstract modern metal sculpture
+  - a modern geometric lamp or light fixture
+  - modern barware and stemware
+  - modern acrylic and lucite sculpture
+  - postmodern geometric glass art
+  - a contemporary glass art sculpture
+  - a modern crystal bowl or candlestick
+  - perfume bottles
+  - a polished metal bowl or tray
+  - a neoclassical nude statue
+  - a mid-century modern lamp
+  - a modern mirror with geometric panels
   - a framed painting
   - a framed print in an ornate frame
   - framed pictures hanging on a wall

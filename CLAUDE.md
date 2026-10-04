@@ -1,18 +1,20 @@
 # EstateSaleWatch
 
 Daily watcher for Front Range CO estate sales (estatesales.net). Flags photos of (1) large mirrors,
-(2) unique cabinets, (3) Buddhist pieces. Digest goes out as a GitHub issue (Wed/Fri) mentioning @empireofryan.
+(2) unique cabinets, (3) Buddhist pieces, (4) Art Deco; also flags whole "high-end" sales. Digest goes out as a GitHub issue (Wed/Fri) mentioning @empireofryan.
 
 ## Stack
 Python 3.12, requests, open_clip (SigLIP ViT-B-16 webli, torch CPU), PyYAML, Pillow. GitHub Actions cron.
 
 ## Key files
-- `watch.py` : scan (default) and `--digest`; flags `--max-sales N`, `--max-images N`
+- `watch.py` : scan (default) and `--digest`; flags `--max-sales N`, `--max-images N`, `--state-dir D` (temp state for tests)
 - `estate/api.py` : list/detail fetch (browser UA, retries, 6 workers), sale normalization
 - `estate/classify.py` : zero-shot scorer; category score = sum of softmax probs of its positive prompts over positives+negatives
 - `config.yaml` : search area, model, prompts (positive + many negatives), thresholds, keyword boosts
 - `tests/calibrate.py` : labeled mirror set (sale id#pictureOrder) + 200 random bg photos; downloads thumbs to tests/_work (delete after)
-- `state/seen.json` (pics+sale end dates), `hits.json`, `digested.json`
+- `estate/sales.py` : sale-level high-end score (per-photo luxe prob stats + text keywords)
+- `tests/calibrate_sales.py` (labeled high-end vs ordinary sales, score table), `tests/deco_sheet.py` (art_deco contact sheet)
+- `state/seen.json` (pics+sale end dates), `hits.json`, `digested.json`, `sales.json` (per-sale luxe stats: n, sum, hi count, top-15, keywords), `standouts.json` (sales already announced)
 - `.github/workflows/watch.yml` : daily 12:00 UTC scan; Wed/Fri digest -> issue; commits state with [skip ci]
 
 ## Commands
@@ -28,8 +30,11 @@ Next ideas: thumbs-up/down feedback to tune thresholds; cabinet category is broa
 - Scheduled work runs on GitHub Actions cron, never the laptop.
 - SigLIP beat laion2b ViT-B-32 on the mirror calibration set (recall 7/7 vs 4/7) but is ~4x slower; max_images_per_run caps CI time.
 - Thresholds after QA 2026-10-03: mirror 0.80, cabinet 0.85, buddhist 0.85 + extra distractor negatives (trunks, screens, necklaces, rosaries, tool chests).
-- To rescore everything after a config change: reset state/seen.json + hits.json, run `.venv/bin/python watch.py --max-images 30000` locally, commit state.
+- To rescore everything after a config change: reset state/seen.json + hits.json + sales.json + standouts.json, run `.venv/bin/python watch.py --max-images 30000` locally, commit state.
 - CI installs torch+torchvision from the CPU index together (mismatch broke the first run).
 - Keep test downloads tiny (thumbnails); disk was once 100% full.
 - Mirror/cabinet/buddhist thresholds chosen on small sets; Buddhist verified on real thangka/Buddha/Guanyin captions (score >0.99).
+- Luxe: same forward pass, separate softmax over luxe vs ordinary prompts (config `luxe`). Sale score = 0.2*mean(top-15 luxe) + 0.8*fraction of photos >=0.8 + 0.04/keyword (cap 0.2) + 0.05 if API-featured; flag at >=0.70 (calibration: HIGH min 0.82, ordinary max 0.54). Top-K saturates at 1.0 for big sales so the 0.8-cut fraction does the separating.
+- art_deco threshold 0.85 (caption keyword adds 0.4). Many modern/postmodern glass+chrome distractor negatives; keyword "=deco" means whole word (so "decor" does not match).
+- A fresh/reset run populates sales.json; sales scored before this feature have no stats and never flag until rescored.
 - Sale detail: type 64 = online auction (tagged in digest); sales with no pictures are skipped.
