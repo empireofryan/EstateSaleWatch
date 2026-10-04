@@ -46,7 +46,7 @@ jobs:
           DOW=$(date -u +%u)
           if [ "${{ github.event_name }}" = "schedule" ]; then
             echo "scan=true" >> "$GITHUB_OUTPUT"
-            if [ "$DOW" = 3 ] || [ "$DOW" = 5 ]; then echo "digest=true" >> "$GITHUB_OUTPUT"; fi
+            echo "digest=true" >> "$GITHUB_OUTPUT"   # daily digest; only never-shown hits
           else
             [ "$MODE" = "scan" ] && echo "scan=true" >> "$GITHUB_OUTPUT"
             [ "$MODE" = "digest" ] && echo "digest=true" >> "$GITHUB_OUTPUT"
@@ -73,6 +73,7 @@ jobs:
           if [ -f digest.md ]; then
             N=$(cat digest_count.txt)
             gh label create digest --color 0E8A16 --force
+            for n in $(gh issue list --label digest --state open --json number -q '.[].number'); do gh issue close "$n" -c "Superseded by today's digest."; done
             gh issue create --title "Estate sale finds – $(date -u +%F) ($N)" \
               --label digest --body-file digest.md
             git config user.name "estate-watch[bot]"

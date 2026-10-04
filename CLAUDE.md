@@ -1,7 +1,7 @@
 # EstateSaleWatch
 
 Daily watcher for Front Range CO estate sales (estatesales.net). Flags photos of (1) large mirrors,
-(2) unique cabinets, (3) Buddhist pieces, (4) Art Deco; also flags whole "high-end" sales. Digest goes out as a GitHub issue (Wed/Fri) mentioning @empireofryan.
+(2) unique cabinets, (3) Buddhist pieces, (4) Art Deco; also flags whole "high-end" sales. Digest goes out as a GitHub issue (daily, never repeats a hit; old issues auto-closed) mentioning @empireofryan.
 
 ## Stack
 Python 3.12, requests, open_clip (SigLIP ViT-B-16 webli, torch CPU), PyYAML, Pillow. GitHub Actions cron.
@@ -15,13 +15,13 @@ Python 3.12, requests, open_clip (SigLIP ViT-B-16 webli, torch CPU), PyYAML, Pil
 - `estate/sales.py` : sale-level high-end score (per-photo luxe prob stats + text keywords)
 - `tests/calibrate_sales.py` (labeled high-end vs ordinary sales, score table), `tests/deco_sheet.py` (art_deco contact sheet)
 - `state/seen.json` (pics+sale end dates), `hits.json`, `digested.json`, `sales.json` (per-sale luxe stats: n, sum, hi count, top-15, keywords), `standouts.json` (sales already announced)
-- `.github/workflows/watch.yml` : daily 12:00 UTC scan; Wed/Fri digest -> issue; commits state with [skip ci]
+- `.github/workflows/watch.yml` : daily 12:00 UTC scan; daily digest -> issue (closes prior digest issues); commits state with [skip ci]
 
 ## Commands
 See README. venv at `.venv/`, all caches under `.cache/` (both gitignored).
 
 ## Status
-LIVE (2026-10-03). Repo: github.com/empireofryan/EstateSaleWatch (private). Daily scan 12:00 UTC; digest issue Wed+Fri (emails via @mention).
+LIVE (2026-10-03). Repo: github.com/empireofryan/EstateSaleWatch (private). Daily scan 12:00 UTC; digest issue daily (since 2026-10-03) (emails via @mention).
 First digest issue #1 sent 2026-10-03 (54 hits). Backlog (15k photos) was scored locally on the Mac (21 img/s); Actions runner does only ~2.4 img/s, so a full rescore must be done locally.
 Sale "standout" threshold 0.92 (2026-10-03: 14 of 93 sales). art_deco 0.92. Jewelry/coins/memorabilia are luxe "ordinary" counterweights.
 Next ideas: thumbs-up/down feedback to tune thresholds; cabinet category is broad ("unique" is subjective).
