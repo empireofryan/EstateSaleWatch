@@ -6,3 +6,4 @@ pyyaml
 transformers
 sentencepiece
 protobuf
+scikit-learn

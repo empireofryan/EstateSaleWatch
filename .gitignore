@@ -5,3 +5,6 @@ __pycache__/
 digest.md
 tests/_work/
 digest_count.txt
+.env.local
+email.html
+email.txt

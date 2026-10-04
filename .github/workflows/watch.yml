@@ -3,20 +3,12 @@ on:
   schedule:
     - cron: "0 12 * * *"   # daily 12:00 UTC
   workflow_dispatch:
-    inputs:
-      mode:
-        description: scan or digest
-        type: choice
-        options: [scan, digest]
-        default: scan
-
 concurrency:
   group: estate-watch
   cancel-in-progress: false
 
 permissions:
   contents: write
-  issues: write
 
 jobs:
   run:
@@ -25,6 +17,13 @@ jobs:
     env:
       HF_HOME: ${{ github.workspace }}/.cache/hf
       TORCH_HOME: ${{ github.workspace }}/.cache/torch
+      TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+      TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      APP_SECRET: ${{ secrets.APP_SECRET }}
+      APP_URL: ${{ secrets.APP_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -39,47 +38,14 @@ jobs:
       - run: |
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
-      - name: Decide what to run
-        id: plan
-        run: |
-          MODE="${{ github.event.inputs.mode }}"
-          DOW=$(date -u +%u)
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "scan=true" >> "$GITHUB_OUTPUT"
-            echo "digest=true" >> "$GITHUB_OUTPUT"   # daily digest; only never-shown hits
-          else
-            [ "$MODE" = "scan" ] && echo "scan=true" >> "$GITHUB_OUTPUT"
-            [ "$MODE" = "digest" ] && echo "digest=true" >> "$GITHUB_OUTPUT"
-          fi
-          exit 0
       - name: Scan
-        if: steps.plan.outputs.scan == 'true'
         run: python watch.py
       - name: Commit scan state
-        if: steps.plan.outputs.scan == 'true'
+        if: always()
         run: |
           git config user.name "estate-watch[bot]"
           git config user.email "actions@users.noreply.github.com"
-          git add state/*.json
+          git add state/seen.json state/sales.json
           git diff --cached --quiet || { git commit -m "state: scan $(date -u +%F) [skip ci]"; git pull --rebase -q; git push; }
-      - name: Digest
-        if: steps.plan.outputs.digest == 'true'
-        run: python watch.py --digest
-      - name: Open digest issue
-        if: steps.plan.outputs.digest == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -f digest.md ]; then
-            N=$(cat digest_count.txt)
-            gh label create digest --color 0E8A16 --force
-            for n in $(gh issue list --label digest --state open --json number -q '.[].number'); do gh issue close "$n" -c "Superseded by today's digest."; done
-            gh issue create --title "Estate sale finds – $(date -u +%F) ($N)" \
-              --label digest --body-file digest.md
-            git config user.name "estate-watch[bot]"
-            git config user.email "actions@users.noreply.github.com"
-            git add state/*.json
-            git diff --cached --quiet || { git commit -m "state: digest $(date -u +%F) [skip ci]"; git pull --rebase -q; git push; }
-          else
-            echo "no new hits, no issue"
-          fi
+      - name: Daily email
+        run: python watch.py --email

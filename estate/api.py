@@ -76,7 +76,7 @@ def normalize(sale, list_row=None):
     city = pc.get("cityName") or sale.get("postalCodeCityName") or (list_row or {}).get("cityName", "")
     zipc = pc.get("postalCodeNumber") or (list_row or {}).get("postalCodeNumber", "")
     street = addr.get("addressLine1") if li.get("showAddress", True) else ""
-    hours = []
+    hours, days = [], []
     for d in sale.get("dates") or []:
         s, e = dt(d.get("localStartDate")), dt(d.get("localEndDate"))
         if not s:
@@ -85,6 +85,8 @@ def normalize(sale, list_row=None):
         if e and d.get("showEndTime", True):
             txt += "-" + _fmt_t(e)
         hours.append(txt)
+        rng = _fmt_t(s) + ("-" + _fmt_t(e) if e and d.get("showEndTime", True) else "")
+        days.append({"date": s.strftime("%Y-%m-%d"), "hours": rng})
     path = sale.get("url") or ""
     return {
         "id": sale.get("saleId"),
@@ -97,7 +99,7 @@ def normalize(sale, list_row=None):
         "address": (street or "").strip(),
         "start": (dt(sale.get("firstLocalStartDate")) or datetime.min).strftime("%Y-%m-%d"),
         "end": (dt(sale.get("lastLocalEndDate")) or datetime.max.replace(year=9999)).strftime("%Y-%m-%d"),
-        "hours": hours,
+        "hours": hours, "days": days,
         "page": BASE + path if path else f"{BASE}/CO/{city.replace(' ', '-')}/{zipc}/{sale.get('saleId')}",
         "text": (sale.get("plainTextDescription") or "")[:4000],
     }

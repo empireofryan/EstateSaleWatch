@@ -4,6 +4,7 @@ import re
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 import yaml
 from PIL import Image
@@ -63,10 +64,12 @@ class Classifier:
         """images: list of PIL -> tensor [N, n_prompts] softmax probs (plus luxe probs if asked).
         Image embeddings are computed once and shared by both prompt sets."""
         out, lout = [], []
+        self.last_feats = []
         for i in range(0, len(images), self.bs):
             x = torch.stack([self.preprocess(im) for im in images[i:i + self.bs]])
             f = self.model.encode_image(x)
             f = f / f.norm(dim=-1, keepdim=True)
+            self.last_feats.append(f.float().cpu().numpy())
             out.append(self._logits(f, self.text).softmax(-1))
             if with_luxe and self.luxe_phr:
                 lout.append(self._logits(f, self.ltext).softmax(-1))
@@ -78,9 +81,10 @@ class Classifier:
         """-> list of {category: (score, top phrase)}; with the luxe set configured each dict also has
         key "_luxe": (P(luxe prompts), top luxe phrase)."""
         p, lp = self.probs(images, with_luxe=True)
+        feats = np.concatenate(self.last_feats) if self.last_feats else np.zeros((0, 0))
         res = []
         for n, row in enumerate(p):
-            d = {}
+            d = {"_emb": feats[n]}  # L2-normalized image embedding (float32)
             for c, idx in self.cat_idx.items():
                 best = max(idx, key=lambda i: row[i].item())
                 d[c] = (float(row[idx].sum()), self.phrases[best])
